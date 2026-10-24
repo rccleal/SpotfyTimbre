@@ -1,12 +1,11 @@
-
-# Credenciais e autenticação do Spotify
+# Credencials e authentication do Spotify
 .env
 .env.*
 !.env.example
 .cache
 .cache-*
 
-# Ambiente virtual Python
+# Virtual environment Python
 .venv/
 venv/
 
@@ -20,18 +19,24 @@ backup/
 backups_timbres/
 base_timbres_backup*.json
 
-# Arquivos gerados pelo PyInstaller
+# Files made by PyInstaller
 build/
 dist/
 *.spec
 
-# Presets Blackstar gerados
+# Presets Blackstar generated
 bstar_presets/
 
-# Arquivos temporários
+# Temporary files
 *.log
 *.tmp
 
-# Arquivos do Windows
+# Windows files
 Thumbs.db
 Desktop.ini
+
+# Adicionals local files
+*.bstar
+base_timbres_com_nome_bstar.json
+.DS_Store
+.vscode/
