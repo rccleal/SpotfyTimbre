@@ -3,95 +3,90 @@ import hashlib
 import shutil
 from pathlib import Path
 
-BASE_JSON = Path("base_timbres.json")
-BACKUP_JSON = Path("base_timbres_backup_antes_renumeracao.json")
-SAIDA_JSON = Path("base_timbres_renumerado.json")
+BASE_JSON = Path("base_tones.json")
+BACKUP_JSON = Path("base_tones_backup_before_renumbering.json")
+SAIDA_JSON = Path("base_tones_renumbered.json")
 
-
-def assinatura_timbre(timbre):
+def assinatura_tone(tone):
     """
-    Cria uma assinatura usando somente amplificador e efeitos.
+    Create a signature using only amp and efects.
 
-    Timbres com amplificador e efeitos exatamente iguais
-    recebem o mesmo nome_bstar.
+    Tones with amp and effects exactly the same
+    receive the same name_bstar.
     """
-    dados = {
-        "amplificador": timbre.get("amplificador", {}),
-        "efeitos": timbre.get("efeitos", {}),
+    data = {
+        "amplifier": tone.get("amplificador", {}),
+        "efects": tone.get("efeitos", {}),
     }
 
-    texto = json.dumps(
-        dados,
+    text = json.dumps(
+        data,
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
     )
 
     return hashlib.sha256(
-        texto.encode("utf-8")
+        text.encode("utf-8")
     ).hexdigest()
 
-
-def remover_nomes_antigos(base):
+def remove_old_names(base):
     """
-    Remove todos os nome_bstar antigos antes de renumerar.
+    Remove all of the name_bstar before renumbering.
     """
-    for musica in base.values():
+    for music in base.values():
 
-        musica.pop("nome_bstar", None)
+        music.pop("nome_bstar", None)
 
-        timbres = musica.get("timbres", {})
+        tones = music.get("timbres", {})
 
-        for timbre in timbres.values():
-            timbre.pop("nome_bstar", None)
+        for tone in tones.values():
+            tone.pop("nome_bstar", None)
 
+def renumber_tones(base):
+    signatures = {}
+    next_number = 1
 
-def renumerar_timbres(base):
-    assinaturas = {}
-    proximo_numero = 1
+    musics_processed = 0
+    variants_processed = 0
 
-    musicas_processadas = 0
-    variantes_processadas = 0
+    for music in base.values():
 
-    for musica in base.values():
+        tones = music.get("timbres")
 
-        timbres = musica.get("timbres")
+        # Songs with CLEAN / DRIVE / SOLO
+        if isinstance(tones, dict) and tones:
 
-        # Música com CLEAN / DRIVE / SOLO
-        if isinstance(timbres, dict) and timbres:
+            for name_tom, tone in tones.items():
 
-            for nome_tom, timbre in timbres.items():
+                signature = assinatura_tone(tone)
 
-                assinatura = assinatura_timbre(timbre)
-
-                if assinatura not in assinaturas:
-                    assinaturas[assinatura] = (
-                        f"Timbre {proximo_numero:03d}"
+                if signature not in signatures:
+                    signatures[signature] = (
+                        f"tone {next_number:03d}"
                     )
-                    proximo_numero += 1
+                    next_number += 1
 
-                timbre["nome_bstar"] = assinaturas[assinatura]
-                variantes_processadas += 1
+                tone["nome_bstar"] = signatures[signature]
+                variants_processed += 1
 
-        # Música com apenas um timbre
+        # Música com apenas um tone
         else:
-            assinatura = assinatura_timbre(musica)
+            signature = assinatura_tone(music)
 
-            if assinatura not in assinaturas:
-                assinaturas[assinatura] = (
-                    f"Timbre {proximo_numero:03d}"
+            if signature not in signatures:
+                signatures[signature] = (
+                    f"tone {next_number:03d}"
                 )
-                proximo_numero += 1
+                next_number += 1
 
-            musica["nome_bstar"] = assinaturas[assinatura]
-            variantes_processadas += 1
+            music["nome_bstar"] = signatures[signature]
+            variants_processed += 1
 
-        musicas_processadas += 1
+        musics_processed += 1
 
     return {
-        "musicas": musicas_processadas,
-        "variantes": variantes_processadas,
-        "presets_unicos": len(assinaturas),
+        "musics": musics_processed,
+        "variants": variants_processed,
+        "presets_unicos": len(signatures),
     }
-
-

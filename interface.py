@@ -1,89 +1,89 @@
 import tkinter as tk
 from tkinter import ttk
-from editor_timbres import abrir_editor # type: ignore
+from editor_timbres import open_editor # type: ignore
 
 
-def iniciar_interface(pegar_musica_atual, pegar_proxima_musica, pegar_timbre,
-                     formatar_timbre, extrair_ms, base_json, chave_musica, recarregar_timbres):
-    def atualizar_interface():
+def start_interface(get_current_song, get_next_song, get_tone,
+                     format_tone, extract_ms, base_json, song_bracket, reload_tones):
+    def update_interface():
         nonlocal delay_ms, modulation_ms
 
-        nome, artista = pegar_musica_atual()
+        name, artist = get_current_song()
 
-        texto_timbre.delete("1.0", tk.END)
+        text_tone.delete("1.0", tk.END)
 
-        if not nome:
-            musica_var.set("Nenhuma música tocando")
-            artista_var.set("")
-            proxima_var.set("Próxima: não identificada")
-            texto_timbre.insert(tk.END, "Abra o Spotify e toque uma música.")
+        if not name:
+            song_var.set("No song playing")
+            artist_var.set("")
+            next_var.set("Next: not identified")
+            text_tone.insert(tk.END, "Open Spotify and play a song.")
             delay_ms = None
             modulation_ms = None
             return
 
-        musica_var.set(nome)
-        artista_var.set(artista)
+        song_var.set(name)
+        artist_var.set(artist)
 
-        timbre = pegar_timbre(nome, artista)
+        tone = get_tone(name, artist)
 
-        if timbre:
-            texto_timbre.insert(tk.END, formatar_timbre(timbre))
+        if tone:
+            text_tone.insert(tk.END, format_tone(tone))
 
-            if "timbres" in timbre:
-                nome_padrao = timbre.get("timbre_padrao", "drive")
+            if isinstance(tone.get("timbres", tone.get("tones")), dict) and tone.get("timbres", tone.get("tones", {})):
+                name_standart = tone.get("standart_tone", tone.get("timbre_padrao", tone.get("tone_standart", "drive")))
 
-                if nome_padrao not in timbre["timbres"]:
-                    nome_padrao = list(timbre["timbres"].keys())[0]
+                if name_standart not in tone.get("timbres", tone.get("tones", {})):
+                    name_standart = next(iter(tone.get("timbres", tone.get("tones", {}))), None)
 
-                fx = timbre["timbres"][nome_padrao].get("efeitos", {})
+                fx = tone.get("timbres", tone.get("tones", {})).get(name_standart, {}).get("efeitos", {})
             else:
-                fx = timbre.get("efeitos", {})
+                fx = tone.get("efeitos", {})
 
             if fx:
-                delay_ms = extrair_ms(fx["delay"].get("tap"))
-                modulation_ms = extrair_ms(fx["modulation"].get("tap"))
+                delay_ms = extract_ms(fx.get("delay", {}).get("tap"))
+                modulation_ms = extract_ms(fx.get("modulation", {}).get("tap"))
             else:
                 delay_ms = None
                 modulation_ms = None
 
         else:
-            texto_timbre.insert(tk.END, "Timbre não cadastrado para essa música.")
+            text_tone.insert(tk.END, "Tone not registered for this song.")
             delay_ms = None
             modulation_ms = None
 
-        prox_nome, prox_artista = pegar_proxima_musica()
+        next_name, next_artist = get_next_song()
 
-        if prox_nome:
-            proxima_var.set(f"Próxima: {prox_nome} - {prox_artista}")
+        if next_name:
+            next_var.set(f"Next: {next_name} - {next_artist}")
         else:
-            proxima_var.set("Próxima: não identificada")
+            next_var.set("Next: not identified")
 
-    def atualizar_automaticamente():
-        atualizar_interface()
-        janela.after(5000, atualizar_automaticamente)
+    def update_automatically():
+        update_interface()
+        window.after(5000, update_automatically)
 
-    def piscar_led_delay():
+    def blink_led_delay():
         if delay_ms:
             canvas.itemconfig(led_delay, fill="#00ff66")
-            janela.after(120, lambda: canvas.itemconfig(led_delay, fill="#003d18"))
-            janela.after(delay_ms, piscar_led_delay)
+            window.after(120, lambda: canvas.itemconfig(led_delay, fill="#003d18"))
+            window.after(delay_ms, blink_led_delay)
         else:
             canvas.itemconfig(led_delay, fill="#202020")
-            janela.after(500, piscar_led_delay)
+            window.after(500, blink_led_delay)
 
-    def piscar_led_modulation():
+    def blink_led_modulation():
         if modulation_ms:
             canvas.itemconfig(led_modulation, fill="#00aaff")
-            janela.after(120, lambda: canvas.itemconfig(led_modulation, fill="#003344"))
-            janela.after(modulation_ms, piscar_led_modulation)
+            window.after(120, lambda: canvas.itemconfig(led_modulation, fill="#003344"))
+            window.after(modulation_ms, blink_led_modulation)
         else:
             canvas.itemconfig(led_modulation, fill="#202020")
-            janela.after(500, piscar_led_modulation)
+            window.after(500, blink_led_modulation)
 
-    janela = tk.Tk()
-    janela.title("Spotify Timbre Finder")
-    janela.geometry("780x700")
-    janela.configure(bg="#121212")
+    window = tk.Tk()
+    window.title("Spotify tone Finder")
+    window.geometry("780x700")
+    window.configure(bg="#121212")
 
     style = ttk.Style()
     style.theme_use("clam")
@@ -92,47 +92,47 @@ def iniciar_interface(pegar_musica_atual, pegar_proxima_musica, pegar_timbre,
     delay_ms = None
     modulation_ms = None
 
-    titulo = tk.Label(
-        janela,
-        text="Spotify Timbre Finder",
+    title = tk.Label(
+        window,
+        text="Spotify tone Finder",
         font=("Arial", 22, "bold"),
         bg="#121212",
         fg="#1DB954"
     )
-    titulo.pack(pady=12)
+    title.pack(pady=12)
 
-    musica_var = tk.StringVar(value="Nenhuma música detectada")
-    artista_var = tk.StringVar(value="")
-    proxima_var = tk.StringVar(value="Próxima: não identificada")
+    song_var = tk.StringVar(value="No song detected")
+    artist_var = tk.StringVar(value="")
+    next_var = tk.StringVar(value="Next: not identified")
 
-    label_musica = tk.Label(
-        janela,
-        textvariable=musica_var,
+    label_song = tk.Label(
+        window,
+        textvariable=song_var,
         font=("Arial", 16, "bold"),
         bg="#121212",
         fg="white"
     )
-    label_musica.pack()
+    label_song.pack()
 
-    label_artista = tk.Label(
-        janela,
-        textvariable=artista_var,
+    label_artist = tk.Label(
+        window,
+        textvariable=artist_var,
         font=("Arial", 13),
         bg="#121212",
         fg="#b3b3b3"
     )
-    label_artista.pack(pady=3)
+    label_artist.pack(pady=3)
 
-    label_proxima = tk.Label(
-        janela,
-        textvariable=proxima_var,
+    label_next = tk.Label(
+        window,
+        textvariable=next_var,
         font=("Arial", 11),
         bg="#121212",
         fg="#f5c542"
     )
-    label_proxima.pack(pady=5)
+    label_next.pack(pady=5)
 
-    frame_leds = tk.Frame(janela, bg="#121212")
+    frame_leds = tk.Frame(window, bg="#121212")
     frame_leds.pack(pady=8)
 
     canvas = tk.Canvas(frame_leds, width=360, height=55, bg="#121212", highlightthickness=0)
@@ -144,30 +144,30 @@ def iniciar_interface(pegar_musica_atual, pegar_proxima_musica, pegar_timbre,
     canvas.create_text(245, 28, text="Mod Tap", fill="white", font=("Arial", 11))
     led_modulation = canvas.create_oval(305, 15, 335, 45, fill="#202020", outline="#555555")
 
-    botao = ttk.Button(
-        janela,
-        text="Atualizar agora",
-        command=atualizar_interface
+    button = ttk.Button(
+        window,
+        text="Update now",
+        command=update_interface
     )
-    botao.pack(pady=8)
+    button.pack(pady=8)
 
-    def abrir_gerenciador():
-        def apos_salvar():
-            recarregar_timbres()
-            atualizar_interface()
-        abrir_editor(janela, base_json, chave_musica, apos_salvar)
+    def open_manager():
+        def after_saving():
+            reload_tones()
+            update_interface()
+        open_editor(window, base_json, song_bracket, after_saving)
 
     ttk.Button(
-        janela,
-        text="Gerenciar músicas e timbres",
-        command=abrir_gerenciador
+        window,
+        text="Manage songs and tones",
+        command=open_manager
     ).pack(pady=5)
 
-    frame_texto = tk.Frame(janela, bg="#121212")
-    frame_texto.pack(fill="both", expand=True, padx=20, pady=10)
+    frame_text = tk.Frame(window, bg="#121212")
+    frame_text.pack(fill="both", expand=True, padx=20, pady=10)
 
-    texto_timbre = tk.Text(
-        frame_texto,
+    text_tone = tk.Text(
+        frame_text,
         font=("Consolas", 11),
         bg="#181818",
         fg="white",
@@ -177,13 +177,13 @@ def iniciar_interface(pegar_musica_atual, pegar_proxima_musica, pegar_timbre,
         padx=15,
         pady=15
     )
-    texto_timbre.pack(fill="both", expand=True)
+    text_tone.pack(fill="both", expand=True)
 
 
 
-    atualizar_interface()
-    atualizar_automaticamente()
-    piscar_led_delay()
-    piscar_led_modulation()
+    update_interface()
+    update_automatically()
+    blink_led_delay()
+    blink_led_modulation()
 
-    janela.mainloop()
+    window.mainloop()

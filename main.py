@@ -7,60 +7,59 @@ from dotenv import dotenv_values # type: ignore
 import spotipy # type: ignore
 from spotipy.oauth2 import SpotifyOAuth # type: ignore
 
-import re
-import unicodedata
 
 
-def normalizar(texto):
+def normalize(text):
 
-    texto = str(texto).lower().strip()
+    text = str(text).lower().strip()
 
-    # -------------------------
-    # 1. REMOVE ACENTOS
-    # -------------------------
+    # -------------------
+    # 1. REMOVE ACCENTS
+    # -------------------
 
-    texto = unicodedata.normalize("NFD", texto)
+    text = unicodedata.normalize("NFD", text)
 
-    texto = "".join(
-        letra
-        for letra in texto
-        if unicodedata.category(letra) != "Mn"
+    text = "".join(
+        letter
+        for letter in text
+        if unicodedata.category(letter) != "Mn"
     )
 
-    # -------------------------
-    # 2. REMOVE PARTICIPAÇÕES
-    # -------------------------
+    # -----------------
+    # 2. REMOVE FEATS
+    # -----------------
 
-    texto = re.sub(
+    text = re.sub(
         r"\s*[\(\[]\s*(?:feat\.?|ft\.?|featuring)\s+.*?[\)\]]",
         "",
-        texto,
+        text,
         flags=re.IGNORECASE
     )
 
-    texto = re.sub(
+    text = re.sub(
         r"\s*[-–—]\s*(?:feat\.?|ft\.?|featuring)\s+.*$",
         "",
-        texto,
+        text,
         flags=re.IGNORECASE
     )
 
-    # -------------------------
-    # 3. REMOVE SUBTÍTULO ESPECÍFICO
-    # -------------------------
+    # -----------------------------
+    # 3. REMOVE SPECIFIC SUBTITLE 
+    # -----------------------------
 
-    texto = re.sub(
+    text = re.sub(
         r"\s*[\(\[]\s*take a look at me now\s*[\)\]]",
         "",
-        texto,
+        text,
         flags=re.IGNORECASE
     )
 
-    # -------------------------
-    # 4. QUALIFICADORES DO SPOTIFY
-    # -------------------------
+    # -----------------------
+    # 4. SPOTIFY QUALIFIERS
+    # Add more if you need
+    # -----------------------
 
-    qualificadores = (
+    qualifiers = (
         r"remaster(?:ed)?"
         r"|remix"
         r"|instrumental"
@@ -91,77 +90,77 @@ def normalizar(texto):
         r"|studio recording"
     )
 
-    # -------------------------
-    # 5. REMOVE VERSÕES ENTRE PARÊNTESES
-    # Exemplos:
+    # -----------------------------------
+    # 5. REMOVE VERSIONS IN PARENTHESES
+    # Examples:
     # (2011 Remaster)
     # (Single Version)
     # (Original Mix)
-    # -------------------------
+    # ------------------------------------
 
-    texto = re.sub(
-        rf"\s*[\(\[][^)\]]*\b(?:{qualificadores})\b[^)\]]*[\)\]]",
+    text = re.sub(
+        rf"\s*[\(\[][^)\]]*\b(?:{qualifiers})\b[^)\]]*[\)\]]",
         "",
-        texto,
+        text,
         flags=re.IGNORECASE
     )
 
-    # -------------------------
-    # 6. REMOVE QUALIFICADORES APÓS HÍFEN
-    # Exemplos:
+    # -----------------------------------
+    # 6. REMOVE QUALIFIERS AFTER HYPHEN
+    # Examples:
     # - 2011 Remaster
     # - Single Version
     # - Mix
     # - Remastered 2009
-    # -------------------------
+    # -----------------------------------
 
-    texto = re.sub(
+    text = re.sub(
         rf"\s+[-–—]\s*"
         rf"(?:(?:\d{{4}})\s+)?"
-        rf"(?:{qualificadores})\b.*$",
+        rf"(?:{qualifiers})\b.*$",
         "",
-        texto,
+        text,
         flags=re.IGNORECASE
     )
 
-    # Também remove "- 2011 Mix"
-    # ou "- 2009 Remastered"
-    texto = re.sub(
+    # Also remove "- 2011 Mix"
+    # or "- 2009 Remastered"
+    text = re.sub(
         rf"\s+[-–—]\s*\d{{4}}\s+"
-        rf"(?:{qualificadores})\b.*$",
+        rf"(?:{qualifiers})\b.*$",
         "",
-        texto,
+        text,
         flags=re.IGNORECASE
     )
 
-    # -------------------------
-    # 7. REMOVE PARÊNTESES RESTANTES
-    # Mantém o comportamento original
-    # -------------------------
+    # ---------------------------------
+    # 7. REMOVE REMAINING PARENTHESES
+    # Keep the original behavior
+    # ---------------------------------
 
-    texto = re.sub(r"\([^)]*\)", "", texto)
-    texto = re.sub(r"\[[^\]]*\]", "", texto)
+    text = re.sub(r"\([^)]*\)", "", text)
+    text = re.sub(r"\[[^\]]*\]", "", text)
 
-    # -------------------------
-    # 8. NORMALIZA PONTUAÇÃO
-    # -------------------------
+    # --------------------------
+    # 8. NORMALIZE PUNCTUATION 
+    # --------------------------
 
-    texto = re.sub(r"[-‐‑‒–—]", " ", texto)
+    text = re.sub(r"[-‐‑‒–—]", " ", text)
 
-    texto = re.sub(r"[^\w\s]", "", texto)
+    text = re.sub(r"[^\w\s]", "", text)
 
-    texto = re.sub(r"\s+", " ", texto)
+    text = re.sub(r"\s+", " ", text)
 
-    return texto.strip()
+    return text.strip()
 
-def caminho_arquivo(nome):
+def file_path(name):
     if getattr(sys, "frozen", False):
-        return os.path.join(os.path.dirname(sys.executable), nome)
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), nome)
+        return os.path.join(os.path.dirname(sys.executable), name)
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
 
-ENV_PATH = caminho_arquivo(".env")
-BASE_TIMBRES = caminho_arquivo("base_timbres.json")
-CACHE_PATH = caminho_arquivo(".cache")
+ENV_PATH = file_path(".env")
+BASE_TONES = file_path("base_timbres.json")
+CACHE_PATH = file_path(".cache")
 
 config = dotenv_values(ENV_PATH)
 
@@ -170,7 +169,7 @@ SPOTIPY_CLIENT_SECRET = config.get("SPOTIPY_CLIENT_SECRET")
 SPOTIPY_REDIRECT_URI = config.get("SPOTIPY_REDIRECT_URI")
 
 if not SPOTIPY_CLIENT_ID:
-    raise Exception(f"Não achei SPOTIPY_CLIENT_ID no arquivo: {ENV_PATH}")
+    raise Exception(f"SPOTIPY_CLIENT_ID not found in the file: {ENV_PATH}")
 
 sp = spotipy.Spotify(
     auth_manager=SpotifyOAuth(
@@ -182,173 +181,145 @@ sp = spotipy.Spotify(
     )
 )
 
-def chave_musica(nome, artista):
-    return f"{normalizar(nome)}|{normalizar(artista)}"
+def song_bracket(name, artist):
+    return f"{normalize(name)}|{normalize(artist)}"
 
-with open(BASE_TIMBRES, "r", encoding="utf-8") as arquivo:
-    timbres_originais = json.load(arquivo)
+with open(BASE_TONES, "r", encoding="utf-8") as arquivo:
+    original_tones = json.load(arquivo)
 
-TIMBRES = {}
+TONES = {}
 
-for chave_original, dados in timbres_originais.items():
-    nome_json = dados.get("musica", "")
-    artista_json = dados.get("artista", "")
+for original_bracket, datas in original_tones.items():
+    name_json = datas.get("musica", datas.get("song", ""))
+    artist_json = datas.get("artista", datas.get("artist", ""))
 
-    # Primeiro tenta usar os campos internos
-    if nome_json and artista_json:
-        chave_normalizada = chave_musica(nome_json, artista_json)
-        TIMBRES[chave_normalizada] = dados
+    # Try to use the internal filds first
+    if name_json and artist_json:
+        normalized_bracket = song_bracket(name_json, artist_json)
+        TONES[normalized_bracket] = datas
 
-    # Também registra usando a chave original como segurança
-    if "|" in chave_original:
-        nome_chave, artista_chave = chave_original.split("|", 1)
+    # Registers the original bracket for safety
+    if "|" in original_bracket:
+        name_bracket, artist_bracket = original_bracket.split("|", 1)
 
-        chave_normalizada_original = chave_musica(
-            nome_chave,
-            artista_chave
+        original_normalized_bracket = song_bracket(
+            name_bracket,
+            artist_bracket
         )
 
-        TIMBRES[chave_normalizada_original] = dados
+        TONES[original_normalized_bracket] = datas
 
 
-def recarregar_timbres():
+def reload_tones():
     """Recarrega a base após salvar pelo editor, sem reiniciar o aplicativo."""
-    global timbres_originais
-    with open(BASE_TIMBRES, "r", encoding="utf-8") as arquivo:
-        timbres_originais = json.load(arquivo)
-    TIMBRES.clear()
-    for chave_original, dados in timbres_originais.items():
-        nome_json = dados.get("musica", "")
-        artista_json = dados.get("artista", "")
-        if nome_json and artista_json:
-            TIMBRES[chave_musica(nome_json, artista_json)] = dados
-        if "|" in chave_original:
-            nome_chave, artista_chave = chave_original.split("|", 1)
-            TIMBRES[chave_musica(nome_chave, artista_chave)] = dados
+    global original_tones
+    with open(BASE_TONES, "r", encoding="utf-8") as arquivo:
+        original_tones = json.load(arquivo)
+    TONES.clear()
+    for original_bracket, datas in original_tones.items():
+        name_json = datas.get("musica", datas.get("song", ""))
+        artist_json = datas.get("artista", datas.get("artist", ""))
+        if name_json and artist_json:
+            TONES[song_bracket(name_json, artist_json)] = datas
+        if "|" in original_bracket:
+            name_bracket, artist_bracket = original_bracket.split("|", 1)
+            TONES[song_bracket(name_bracket, artist_bracket)] = datas
 
 
-def extrair_ms(tap_texto):
-    if not tap_texto:
+def extract_ms(tap_text):
+    if not tap_text:
         return None
 
-    texto = tap_texto.lower()
+    text = tap_text.lower()
 
-    if "desligado" in texto or "off" in texto:
+    if "off" in text or "desligado" in text:
         return None
 
-    # Caso venha em ms: "380ms", "aprox. 430ms"
-    ms = re.search(r"(\d+)\s*ms", texto)
+    # If it comes in ms: "380ms", "aprox. 430ms"
+    ms = re.search(r"(\d+)\s*ms", text)
     if ms:
         return int(ms.group(1))
 
-    # Caso venha em BPM: "80 BPM", "aprox. 120 BPM"
-    bpm = re.search(r"(\d+)\s*bpm", texto)
+    # If it comes in BPM: "80 BPM", "aprox. 120 BPM"
+    bpm = re.search(r"(\d+)\s*bpm", text)
     if bpm:
-        valor_bpm = int(bpm.group(1))
-        return int(60000 / valor_bpm)
+        value_bpm = int(bpm.group(1))
+        return int(60000 / value_bpm) if value_bpm else None if value_bpm else None
 
     return None
 
-def pegar_timbre(nome, artista):
-    chave = chave_musica(nome, artista)
+def get_tone(name, artist):
+    bracket = song_bracket(name, artist)
 
     print("\n=== DIAGNÓSTICO ===")
-    print("Música recebida:", repr(nome))
-    print("Artista recebido:", repr(artista))
-    print("Chave procurada:", repr(chave))
-    print("Encontrada no JSON:", chave in TIMBRES)
+    print("Song received:", repr(name))
+    print("Artist received:", repr(artist))
+    print("Bracket surched:", repr(bracket))
+    print("Found in JSON:", bracket in TONES)
 
-    return TIMBRES.get(chave)
+    return TONES.get(bracket)
 
-def pegar_musica_atual():
-    tocando = sp.current_user_playing_track()
+def get_current_song():
+    playing = sp.current_user_playing_track()
 
-    if not tocando or not tocando.get("item"):
+    if not playing or not playing.get("item"):
         return None, None
 
-    item = tocando["item"]
+    item = playing["item"]
     return item["name"], item["artists"][0]["name"]
 
-def pegar_proxima_musica():
+def get_next_song():
     try:
-        fila = sp.queue()
-        proximas = fila.get("queue", [])
+        queue = sp.queue()
+        next = queue.get("queue", [])
 
-        if not proximas:
+        if not next:
             return None, None
 
-        proxima = proximas[0]
+        next = next[0]
 
-        if proxima.get("type") != "track":
+        if next.get("type") != "track":
             return None, None
 
-        return proxima["name"], proxima["artists"][0]["name"]
+        return next["name"], next["artists"][0]["name"]
 
     except Exception:
         return None, None
 
-def formatar_timbre(timbre):
-
-    texto = f"""
-AFINAÇÃO
-{timbre["afinacao"]}
-"""
-
-    if "timbres" in timbre:
-        texto += "\n\nTIMBRES PARA SELECIONAR"
-
-        for nome_tom, dados in timbre["timbres"].items():
-            guitarra = dados["guitarra"]
-
-            texto += f"""
-
-{nome_tom.upper()} → {dados.get("nome_bstar", "NÃO GERADO")}
-
-GUITARRA
-Captador: {guitarra["captador"]}
-Volume: {guitarra["volume"]}
-Tone: {guitarra["tone"]}
-"""
-
-    else:
-        guitarra = timbre["guitarra"]
-
-        texto += f"""
-
-TIMBRE PARA SELECIONAR
-{timbre.get("nome_bstar", "NÃO GERADO")}
-
-GUITARRA
-Captador: {guitarra["captador"]}
-Volume: {guitarra["volume"]}
-Tone: {guitarra["tone"]}
-"""
-
-    texto += f"""
-
-OBSERVAÇÕES
-{timbre["observacoes"]}
-"""
-
-    return texto.strip()
+def format_tone(tone):
+    """Format both single-tone and multi-variant records."""
+    lines = ["TUNING", str(tone.get("afinacao", tone.get("tuning", "")))]
+    variants = tone.get("timbres", tone.get("tones"))
+    if not isinstance(variants, dict) or not variants:
+        variants = {"main": tone}
+    lines.append("\nTONES TO SELECT")
+    for variant_name, data in variants.items():
+        guitar = data.get("guitarra", data.get("guitar", {}))
+        lines.extend([
+            "", f"{variant_name.upper()} → {data.get('nome_bstar', data.get('name_bstar', 'NOT GENERATED'))}",
+            "GUITAR", f"Pickup: {guitar.get('captador', guitar.get('pickup', ''))}",
+            f"Volume: {guitar.get('volume', '')}", f"Tone: {guitar.get('tone', '')}"
+        ])
+    lines.extend(["", "OBSERVATIONS", str(tone.get("observacoes", tone.get("observations", "")))])
+    return "\n".join(lines).strip()
 
 
 if __name__ == "__main__":
-    from interface import iniciar_interface # type: ignore
+    from interface import start_interface # type: ignore
 
-    iniciar_interface(
-        pegar_musica_atual=pegar_musica_atual,
-        pegar_proxima_musica=pegar_proxima_musica,
-        pegar_timbre=pegar_timbre,
-        formatar_timbre=formatar_timbre,
-        extrair_ms=extrair_ms,
-        base_json=BASE_TIMBRES,
-        chave_musica=chave_musica,
-        recarregar_timbres=recarregar_timbres,
+    start_interface(
+        get_current_song=get_current_song,
+        get_next_song=get_next_song,
+        get_tone=get_tone,
+        format_tone=format_tone,
+        extract_ms=extract_ms,
+        base_json=BASE_TONES,
+        song_bracket=song_bracket,
+        reload_tones=reload_tones,
     )
 
 #cd E:\programacao\Spotfy
 #Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 #.\.venv\Scripts\Activate.ps1
 #.\.venv\Scripts\python.exe main.py
-#.\.venv\Scripts\pyinstaller.exe --noconsole --onedir --name SpotifyTimbreFinder main.py
+#.\.venv\Scripts\pyinstaller.exe --noconsole --onedir --name SpotifytoneFinder main.py

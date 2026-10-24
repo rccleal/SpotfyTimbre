@@ -5,321 +5,351 @@ import shutil
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import messagebox, ttk, simpledialog
 import tkinter as tk
 
-from bstar_numeracao import remover_nomes_antigos, renumerar_timbres # type: ignore
-from bstar_export import gerar_patches # type: ignore
+from bstar_numeracao import remove_old_names, renumber_tones # type: ignore
+from bstar_export import create_patches # type: ignore
 
-PASTA_BLACKSTAR = Path.home() / "OneDrive" / "Documentos" / "Blackstar" / "Saved Patches" / "Patches"
+BLACKSTAR_FOLDER = Path.home() / "OneDrive" / "Documentos" / "Blackstar" / "Saved Patches" / "Patches"
 VOICES = ["Clean Warm", "Clean Bright", "Crunch", "Super Crunch", "OD1", "OD2"]
 TVPS = ["EL84", "6V6", "EL34", "KT66", "6L6", "KT88"]
-TIPOS = {"modulation": ["Desligado", "Phaser", "Flanger", "Chorus", "Tremolo"],
-         "delay": ["Desligado", "Linear", "Analogue", "Tape", "Multi"],
-         "reverb": ["Desligado", "Room", "Hall", "Spring", "Plate"]}
+TYPES = {"modulation": ["Off", "Phaser", "Flanger", "Chorus", "Tremolo"],
+         "delay": ["Off", "Linear", "Analogue", "Tape", "Multi"],
+         "reverb": ["Off", "Room", "Hall", "Spring", "Plate"]}
 
-def abrir_editor(janela, base_json, chave_musica, ao_salvar):
+def open_editor(window, base_json, bracket_song, when_save):
     base_json = Path(base_json)
     base = json.loads(base_json.read_text(encoding="utf-8"))
-    janela_ed = tk.Toplevel(janela)
-    janela_ed.title("Gerenciar músicas e timbres")
-    janela_ed.geometry("990x780")
-    janela_ed.transient(janela)
-    # Tema escuro para toda a janela de edição (incluindo campos e menus).
+    window_ed = tk.Toplevel(window)
+    window_ed.title("Manage songs and tones")
+    window_ed.geometry("990x780")
+    window_ed.transient(window)
+    # Black theme for all editing window (including filds and menu).
     BG = "#121212"
     PANEL = "#1d1d1d"
     INPUT = "#282828"
     FG = "#f5f5f5"
     MUTED = "#b3b3b3"
     ACCENT = "#1db954"
-    janela_ed.configure(bg=BG)
-    estilo = ttk.Style(janela_ed)
-    estilo.theme_use("clam")
-    estilo.configure("Editor.TFrame", background=BG)
-    estilo.configure("Editor.TLabelframe", background=PANEL, bordercolor="#444444")
-    estilo.configure("Editor.TLabelframe.Label", background=PANEL, foreground=ACCENT, font=("Arial", 10, "bold"))
-    estilo.configure("Editor.TLabel", background=BG, foreground=FG)
-    estilo.configure("Editor.TEntry", fieldbackground=INPUT, foreground=FG, insertcolor=FG, bordercolor="#444444")
-    estilo.configure("Editor.TCombobox", fieldbackground=INPUT, background=INPUT, foreground=FG, arrowcolor=FG, bordercolor="#444444")
-    estilo.map("Editor.TCombobox", fieldbackground=[("readonly", INPUT)], foreground=[("readonly", FG)], selectbackground=[("readonly", INPUT)], selectforeground=[("readonly", FG)])
-    estilo.configure("Editor.TButton", background="#303030", foreground=FG, padding=7)
-    estilo.map("Editor.TButton", background=[("active", "#404040"), ("pressed", ACCENT)], foreground=[("active", FG)])
-    estilo.configure("Editor.Vertical.TScrollbar", background="#303030", troughcolor=BG, arrowcolor=FG)
-    # Cores da lista suspensa nativa dos comboboxes (quando suportadas pelo Tk).
+    window_ed.configure(bg=BG)
+    style = ttk.Style(window_ed)
+    style.theme_use("clam")
+    style.configure("Editor.TFrame", background=BG)
+    style.configure("Editor.TLabelframe", background=PANEL, bordercolor="#444444")
+    style.configure("Editor.TLabelframe.Label", background=PANEL, foreground=ACCENT, font=("Arial", 10, "bold"))
+    style.configure("Editor.TLabel", background=BG, foreground=FG)
+    style.configure("Editor.TEntry", fieldbackground=INPUT, foreground=FG, insertcolor=FG, bordercolor="#444444")
+    style.configure("Editor.TCombobox", fieldbackground=INPUT, background=INPUT, foreground=FG, arrowcolor=FG, bordercolor="#444444")
+    style.map("Editor.TCombobox", fieldbackground=[("readonly", INPUT)], foreground=[("readonly", FG)], selectbackground=[("readonly", INPUT)], selectforeground=[("readonly", FG)])
+    style.configure("Editor.TButton", background="#303030", foreground=FG, padding=7)
+    style.map("Editor.TButton", background=[("active", "#404040"), ("pressed", ACCENT)], foreground=[("active", FG)])
+    style.configure("Editor.Vertical.TScrollbar", background="#303030", troughcolor=BG, arrowcolor=FG)
+    # Colors in the list of the comboboxes (when supported by Tk).
     try:
-        janela_ed.option_add("*TCombobox*Listbox.background", INPUT)
-        janela_ed.option_add("*TCombobox*Listbox.foreground", FG)
-        janela_ed.option_add("*TCombobox*Listbox.selectBackground", ACCENT)
-        janela_ed.option_add("*TCombobox*Listbox.selectForeground", "#000000")
+        window_ed.option_add("*TCombobox*Listbox.background", INPUT)
+        window_ed.option_add("*TCombobox*Listbox.foreground", FG)
+        window_ed.option_add("*TCombobox*Listbox.selectBackground", ACCENT)
+        window_ed.option_add("*TCombobox*Listbox.selectForeground", "#000000")
     except tk.TclError:
         pass
-    raiz = ttk.Frame(janela_ed, style="Editor.TFrame", padding=12)
-    raiz.pack(fill="both", expand=True)
+    root = ttk.Frame(window_ed, style="Editor.TFrame", padding=12)
+    root.pack(fill="both", expand=True)
 
-    topo = ttk.Frame(raiz, style="Editor.TFrame")
-    topo.pack(fill="x")
-    ttk.Label(topo, style="Editor.TLabel", text="Música cadastrada:").pack(side="left")
-    chaves = list(base)
-    nomes = [f'{v.get("musica", k.split("|")[0])} — {v.get("artista", k.split("|")[-1])}' for k,v in base.items()]
-    selecao = ttk.Combobox(topo, style="Editor.TCombobox", values=nomes, state="readonly", width=62)
-    selecao.pack(side="left", padx=7, fill="x", expand=True)
-    ttk.Button(topo, style="Editor.TButton", text="Nova música", command=lambda: nova()).pack(side="left")
-    ttk.Button(topo, style="Editor.TButton", text="Duplicar timbres", command=lambda: duplicar()).pack(side="left", padx=5)
+    search_bar = ttk.Frame(root, style="Editor.TFrame")
+    search_bar.pack(fill="x", pady=(0, 8))
+    ttk.Label(search_bar, style="Editor.TLabel", text="Search existing song:").pack(side="left")
+    search_var = tk.StringVar()
+    search_entry = ttk.Entry(search_bar, style="Editor.TEntry", textvariable=search_var)
+    search_entry.pack(side="left", padx=7, fill="x", expand=True)
+    search_count = tk.StringVar()
+    ttk.Label(search_bar, style="Editor.TLabel", textvariable=search_count).pack(side="right")
 
-    linha = ttk.Frame(raiz, style="Editor.TFrame")
-    linha.pack(fill="x", pady=9)
-    campos = {}
-    for label, campo, largura in [("Música", "musica", 33), ("Artista", "artista", 28), ("Afinação", "afinacao", 28)]:
-        bloco = ttk.Frame(linha, style="Editor.TFrame")
-        bloco.pack(side="left", fill="x", expand=True, padx=3)
-        ttk.Label(bloco, style="Editor.TLabel", text=label).pack(anchor="w")
-        ent = ttk.Entry(bloco, style="Editor.TEntry", width=largura)
+    top = ttk.Frame(root, style="Editor.TFrame")
+    top.pack(fill="x")
+    ttk.Label(top, style="Editor.TLabel", text="Registered song:").pack(side="left")
+    brackets = list(base)
+    def display_name(key):
+        item = base[key]
+        return f'{item.get("musica", item.get("song")) or key.split("|")[0]} — {item.get("artista", item.get("artist")) or key.split("|")[-1]}'
+    visible_brackets = list(brackets)
+    selection = ttk.Combobox(top, style="Editor.TCombobox", state="readonly", width=62)
+    selection.pack(side="left", padx=7, fill="x", expand=True)
+    ttk.Button(top, style="Editor.TButton", text="New song", command=lambda: new()).pack(side="left")
+    ttk.Button(top, style="Editor.TButton", text="Duplicate tones", command=lambda: duplicate()).pack(side="left", padx=5)
+
+    def filter_songs(*_):
+        query = search_var.get().casefold().strip()
+        terms = query.split()
+        visible_brackets[:] = [key for key in brackets
+                               if all(term in display_name(key).casefold() for term in terms)]
+        selection["values"] = [display_name(key) for key in visible_brackets]
+        search_count.set(f"{len(visible_brackets)} found")
+        selected_key = current["bracket"]
+        if selected_key not in visible_brackets:
+            selection.set("")
+
+    search_var.trace_add("write", filter_songs)
+
+    line = ttk.Frame(root, style="Editor.TFrame")
+    line.pack(fill="x", pady=9)
+    fields = {}
+    for label, field, width in [("Song", "musica", 33), ("Artist", "artista", 28), ("Tuning", "afinacao", 28)]:
+        block = ttk.Frame(line, style="Editor.TFrame")
+        block.pack(side="left", fill="x", expand=True, padx=3)
+        ttk.Label(block, style="Editor.TLabel", text=label).pack(anchor="w")
+        ent = ttk.Entry(block, style="Editor.TEntry", width=width)
         ent.pack(fill="x")
-        campos[campo] = ent
+        fields[field] = ent
 
-    obs_frame = ttk.Frame(raiz, style="Editor.TFrame")
+    obs_frame = ttk.Frame(root, style="Editor.TFrame")
     obs_frame.pack(fill="x")
-    ttk.Label(obs_frame, style="Editor.TLabel", text="Observações").pack(anchor="w")
-    observacoes = tk.Text(obs_frame, height=3, wrap="word", bg=INPUT, fg=FG, insertbackground=FG, selectbackground="#146d38", relief="flat", padx=8, pady=6)
-    observacoes.pack(fill="x")
+    ttk.Label(obs_frame, style="Editor.TLabel", text="Observations").pack(anchor="w")
+    observations = tk.Text(obs_frame, height=3, wrap="word", bg=INPUT, fg=FG, insertbackground=FG, selectbackground="#146d38", relief="flat", padx=8, pady=6)
+    observations.pack(fill="x")
 
-    faixa = ttk.Frame(raiz, style="Editor.TFrame")
-    faixa.pack(fill="x", pady=8)
-    ttk.Label(faixa, style="Editor.TLabel", text="Timbre/variante:").pack(side="left")
-    variante = ttk.Combobox(faixa, style="Editor.TCombobox", width=24, state="readonly")
-    variante.pack(side="left", padx=7)
-    ttk.Button(faixa, style="Editor.TButton", text="+ Adicionar variante", command=lambda: adicionar_variante()).pack(side="left", padx=5)
-    ttk.Button(faixa, style="Editor.TButton", text="Excluir variante", command=lambda: excluir_variante()).pack(side="left", padx=5)
+    strip = ttk.Frame(root, style="Editor.TFrame")
+    strip.pack(fill="x", pady=8)
+    ttk.Label(strip, style="Editor.TLabel", text="Tone/variant:").pack(side="left")
+    variant = ttk.Combobox(strip, style="Editor.TCombobox", width=24, state="readonly")
+    variant.pack(side="left", padx=7)
+    ttk.Button(strip, style="Editor.TButton", text="+ Add variant", command=lambda: add_variant()).pack(side="left", padx=5)
+    ttk.Button(strip, style="Editor.TButton", text="Remove variant", command=lambda: remove_variant()).pack(side="left", padx=5)
 
-    canvas = tk.Canvas(raiz, highlightthickness=0, bg=BG)
-    barra = ttk.Scrollbar(raiz, style="Editor.Vertical.TScrollbar", orient="vertical", command=canvas.yview)
-    interno = ttk.Frame(canvas, style="Editor.TFrame", padding=(5, 4))
-    interno.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-    canvas.create_window((0,0), window=interno, anchor="nw")
-    canvas.configure(yscrollcommand=barra.set)
+    canvas = tk.Canvas(root, highlightthickness=0, bg=BG)
+    bar = ttk.Scrollbar(root, style="Editor.Vertical.TScrollbar", orient="vertical", command=canvas.yview)
+    internal = ttk.Frame(canvas, style="Editor.TFrame", padding=(5, 4))
+    internal.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+    canvas.create_window((0,0), window=internal, anchor="nw")
+    canvas.configure(yscrollcommand=bar.set)
     canvas.pack(side="left", fill="both", expand=True)
-    barra.pack(side="right", fill="y")
+    bar.pack(side="right", fill="y")
 
-    controles = {}
-    def secao(titulo, itens):
-        frame = ttk.LabelFrame(interno, style="Editor.TLabelframe", text=titulo, padding=9)
+    controls = {}
+    def section(title, itens):
+        frame = ttk.LabelFrame(internal, style="Editor.TLabelframe", text=title, padding=9)
         frame.pack(fill="x", pady=5)
-        for i,(caminho,rotulo,opcoes) in enumerate(itens):
+        for i,(path,label,options) in enumerate(itens):
             row, col = divmod(i, 3)
             sub = ttk.Frame(frame, style="Editor.TFrame")
             sub.grid(row=row, column=col, sticky="ew", padx=7, pady=4)
             frame.columnconfigure(col, weight=1)
-            ttk.Label(sub, style="Editor.TLabel", text=rotulo).pack(anchor="w")
-            widget = ttk.Combobox(sub, style="Editor.TCombobox", values=opcoes, width=25) if opcoes else ttk.Entry(sub, style="Editor.TEntry", width=27)
+            ttk.Label(sub, style="Editor.TLabel", text=label).pack(anchor="w")
+            widget = ttk.Combobox(sub, style="Editor.TCombobox", values=options, width=25) if options else ttk.Entry(sub, style="Editor.TEntry", width=27)
             widget.pack(fill="x")
-            controles[caminho] = widget
+            controls[path] = widget
 
-    secao("Guitarra", [(("guitarra", k), r, None) for k,r in [
-        ("captador","Captador"), ("volume","Volume"), ("tone","Tone")]])
-    secao("Amplificador", [(("amplificador", k), r, o) for k,r,o in [
+    section("Guitar", [(("guitarra", k), r, None) for k,r in [
+        ("captador","Pickup"), ("volume","Volume"), ("tone","Tone")]])
+    section("Amplifier", [(("amplificador", k), r, o) for k,r,o in [
         ("voice","Voice",VOICES),("gain","Gain",None),("bass","Bass",None),
         ("middle","Middle",None),("treble","Treble",None),("isf","ISF",None),
         ("tvp","TVP",TVPS)]])
-    for grupo, nome, itens in [
-        ("modulation","Modulação",["type","depth","mix","speed","tap"]),
+    for group, name, itens in [
+        ("modulation","Modulation",["type","depth","mix","speed","tap"]),
         ("delay","Delay",["type","level","feedback","time","tap"]),
         ("reverb","Reverb",["type","level","size"])]:
-        secao(nome, [(("efeitos",grupo,k),k.title(),TIPOS[grupo] if k=="type" else None) for k in itens])
+        section(name, [(("efeitos",group,k),k.title(),TYPES[group] if k=="type" else None) for k in itens])
 
-    ttk.Label(raiz, style="Editor.TLabel", text=f"JSON será salvo em: {base_json}").pack(anchor="w", pady=(4, 0))
+    ttk.Label(root, style="Editor.TLabel", text=f"JSON will be saved in: {base_json}").pack(anchor="w", pady=(4, 0))
 
-    rodape = ttk.Frame(janela_ed, style="Editor.TFrame", padding=12)
-    rodape.pack(fill="x")
-    ttk.Label(rodape, style="Editor.TLabel", text="Destino exclusivo dos .bstar:").pack(side="left")
-    pasta = ttk.Entry(rodape, style="Editor.TEntry")
-    pasta.insert(0, str(PASTA_BLACKSTAR))
-    pasta.pack(side="left", fill="x", expand=True, padx=8)
-    ttk.Button(rodape, style="Editor.TButton", text="Salvar JSON e gerar .bstar", command=lambda: salvar()).pack(side="right")
+    baseboard = ttk.Frame(window_ed, style="Editor.TFrame", padding=12)
+    baseboard.pack(fill="x")
+    ttk.Label(baseboard, style="Editor.TLabel", text="Exclusive destination .bstar:").pack(side="left")
+    folder = ttk.Entry(baseboard, style="Editor.TEntry")
+    folder.insert(0, str(BLACKSTAR_FOLDER))
+    folder.pack(side="left", fill="x", expand=True, padx=8)
+    ttk.Button(baseboard, style="Editor.TButton", text="Save JSON and create .bstar", command=lambda: save()).pack(side="right")
 
-    atual = {"chave": None, "dados": {}, "variante": None, "variantes": {}}
+    current = {"bracket": None, "data": {}, "variant": None, "variants": {}}
 
-    def set_entry(widget, valor):
+    def set_entry(widget, value):
         widget.delete(0, tk.END)
-        widget.insert(0, str(valor if valor is not None else ""))
+        widget.insert(0, str(value if value is not None else ""))
 
-    def preencher_variante(nome):
-        dados = atual["variantes"].get(nome, {})
-        for caminho, widget in controles.items():
-            val = dados
-            for parte in caminho:
-                val = val.get(parte, {}) if isinstance(val, dict) else {}
-            set_entry(widget, val if not isinstance(val, dict) else "")
-        atual["variante"] = nome
+    def fill_variant(name):
+        data = current["variants"].get(name, {})
+        for path, widget in controls.items():
+            value = data
+            for part in path:
+                value = value.get(part, {}) if isinstance(value, dict) else {}
+            set_entry(widget, value if not isinstance(value, dict) else "")
+        current["variant"] = name
 
-    def recolher_variante():
-        nome = atual["variante"]
-        if nome is None:
+    def colect_variant():
+        name = current["variant"]
+        if name is None:
             return
-        dados = copy.deepcopy(atual["variantes"].get(nome, {}))
-        for caminho, widget in controles.items():
-            alvo = dados
-            for parte in caminho[:-1]:
-                alvo = alvo.setdefault(parte, {})
-            alvo[caminho[-1]] = widget.get().strip()
-        atual["variantes"][nome] = dados
+        data = copy.deepcopy(current["variants"].get(name, {}))
+        for path, widget in controls.items():
+            target = data
+            for part in path[:-1]:
+                target = target.setdefault(part, {})
+            target[path[-1]] = widget.get().strip()
+        current["variants"][name] = data
 
-    def mudar_variante(event=None):
-        recolher_variante()
-        preencher_variante(variante.get())
+    def change_variant(event=None):
+        colect_variant()
+        fill_variant(variant.get())
 
-    def preencher_musica(chave):
-        atual["chave"] = chave
-        dados = copy.deepcopy(base.get(chave, {})) if chave else {}
-        atual["dados"] = dados
-        for nome in campos:
-            set_entry(campos[nome], dados.get(nome,""))
-        observacoes.delete("1.0",tk.END)
-        observacoes.insert("1.0",dados.get("observacoes",""))
-        if isinstance(dados.get("timbres"),dict) and dados["timbres"]:
-            atual["variantes"] = copy.deepcopy(dados["timbres"])
+    def fill_song(bracket):
+        current["bracket"] = bracket
+        data = copy.deepcopy(base.get(bracket, {})) if bracket else {}
+        current["data"] = data
+        for name in fields:
+            set_entry(fields[name], data.get(name,""))
+        observations.delete("1.0",tk.END)
+        observations.insert("1.0",data.get("observacoes",""))
+        if isinstance(data.get("timbres"),dict) and data["timbres"]:
+            current["variants"] = copy.deepcopy(data["timbres"])
         else:
-            atual["variantes"] = {"principal":copy.deepcopy(dados)}
-        variante["values"] = list(atual["variantes"])
-        primeiro = next(iter(atual["variantes"]))
-        variante.set(primeiro)
-        atual["variante"] = None
-        preencher_variante(primeiro)
+            current["variants"] = {"main":copy.deepcopy(data)}
+        variant["values"] = list(current["variants"])
+        first = next(iter(current["variants"]))
+        variant.set(first)
+        current["variant"] = None
+        fill_variant(first)
 
-    def escolher(event=None):
-        i = selecao.current()
-        if i >= 0:
-            preencher_musica(chaves[i])
+    def choose(event=None):
+        i = selection.current()
+        if 0 <= i < len(visible_brackets):
+            fill_song(visible_brackets[i])
 
-    def nova():
-        selecao.set("")
-        preencher_musica(None)
-        for nome in campos:
-            set_entry(campos[nome],"")
-        observacoes.delete("1.0",tk.END)
+    def new():
+        selection.set("")
+        fill_song(None)
+        for name in fields:
+            set_entry(fields[name],"")
+        observations.delete("1.0",tk.END)
 
-    def duplicar():
-        # Cria uma música nova copiando os ajustes que estão no editor.
-        recolher_variante()
-        atual["chave"] = None
-        selecao.set("")
-        set_entry(campos["musica"], "")
-        set_entry(campos["artista"], "")
-        campos["musica"].focus_set()
+    def duplicate():
+        # Criate a new song copying the settings that are on the editor.
+        colect_variant()
+        current["bracket"] = None
+        selection.set("")
+        set_entry(fields["musica"], "")
+        set_entry(fields["artista"], "")
+        fields["musica"].focus_set()
 
-    def adicionar_variante():
-        recolher_variante()
-        nome = tk.simpledialog.askstring("Nova variante", "Nome da variante (ex.: clean, drive, solo):", parent=janela_ed)
-        if not nome:
+    def add_variant():
+        colect_variant()
+        name = simpledialog.askstring("New variant", "Name of the variant (ex.: clean, drive, solo):", parent=window_ed)
+        if not name:
             return
-        nome = nome.strip().lower()
-        if nome in atual["variantes"]:
-            messagebox.showwarning("Variante existente", "Essa variante já existe.", parent=janela_ed)
+        name = name.strip().lower()
+        if name in current["variants"]:
+            messagebox.showwarning("Existing variant", "This variant already exists.", parent=window_ed)
             return
-        atual["variantes"][nome] = copy.deepcopy(atual["variantes"].get(atual["variante"], {}))
-        variante["values"] = list(atual["variantes"])
-        variante.set(nome)
-        preencher_variante(nome)
+        current["variants"][name] = copy.deepcopy(current["variants"].get(current["variant"], {}))
+        variant["values"] = list(current["variants"])
+        variant.set(name)
+        fill_variant(name)
 
-    def excluir_variante():
-        if len(atual["variantes"]) <= 1:
-            messagebox.showwarning("Não permitido","Mantenha pelo menos um timbre.",parent=janela_ed)
+    def remove_variant():
+        if len(current["variants"]) <= 1:
+            messagebox.showwarning("Not permitted","Keep at least one tone.",parent=window_ed)
             return
-        nome = variante.get()
-        if messagebox.askyesno("Excluir variante",f"Excluir a variante {nome}?",parent=janela_ed):
-            del atual["variantes"][nome]
-            primeiro = next(iter(atual["variantes"]))
-            variante["values"] = list(atual["variantes"])
-            variante.set(primeiro)
-            atual["variante"] = None
-            preencher_variante(primeiro)
+        name = variant.get()
+        if messagebox.askyesno("Remove variant",f"Remove the variant {name}?",parent=window_ed):
+            del current["variants"][name]
+            first = next(iter(current["variants"]))
+            variant["values"] = list(current["variants"])
+            variant.set(first)
+            current["variant"] = None
+            fill_variant(first)
 
-    def salvar():
+    def save():
         try:
-            recolher_variante()
-            nome = campos["musica"].get().strip()
-            artista = campos["artista"].get().strip()
-            if not nome or not artista:
-                raise ValueError("Informe música e artista.")
-            chave = chave_musica(nome, artista)
-            if chave in base and chave != atual["chave"]:
-                if not messagebox.askyesno("Já cadastrada", "Essa chave já existe. Deseja sobrescrever?", parent=janela_ed):
+            colect_variant()
+            name = fields["musica"].get().strip()
+            artist = fields["artista"].get().strip()
+            if not name or not artist:
+                raise ValueError("Inform song and artist.")
+            bracket = bracket_song(name, artist)
+            if bracket in base and bracket != current["bracket"]:
+                if not messagebox.askyesno("Already registered", "This song already exists. Do you want to overwrite it?", parent=window_ed):
                     return
-            registro = copy.deepcopy(atual["dados"])
-            registro.update(musica=nome, artista=artista,
-                            afinacao=campos["afinacao"].get().strip(),
-                            observacoes=observacoes.get("1.0",tk.END).strip())
-            variantes = copy.deepcopy(atual["variantes"])
-            if len(variantes)==1 and "principal" in variantes:
-                registro.pop("timbres",None)
-                registro.update({
-                    k: copy.deepcopy(variantes["principal"].get(k, {}))
+            register = copy.deepcopy(current["data"])
+            register.update(musica=name, artista=artist,
+                            afinacao=fields["afinacao"].get().strip(),
+                            observacoes=observations.get("1.0",tk.END).strip())
+            variants = copy.deepcopy(current["variants"])
+            if len(variants)==1 and "main" in variants:
+                register.pop("timbres",None)
+                register.update({
+                    k: copy.deepcopy(variants["main"].get(k, {}))
                     for k in ("guitarra", "amplificador", "efeitos")
                 })
-                registro["observacoes"] = observacoes.get("1.0",tk.END).strip()
+                register["observacoes"] = observations.get("1.0",tk.END).strip()
             else:
-                registro["timbres"] = variantes
-                registro["tipo_timbre"] = "multi"
-                registro["timbre_padrao"] = registro.get("timbre_padrao") if registro.get("timbre_padrao") in variantes else next(iter(variantes))
-            for v in variantes.values():
+                register["timbres"] = variants
+                register["tipo_timbre"] = "multi"
+                register["timbre_padrao"] = register.get("timbre_padrao") if register.get("timbre_padrao") in variants else next(iter(variants))
+            for v in variants.values():
                 amp = v.get("amplificador",{})
                 fx = v.get("efeitos",{})
                 if not amp.get("voice") or not amp.get("tvp"):
-                    raise ValueError("Preencha Voice e TVP em todos os timbres.")
-                for grupo in ("modulation","delay","reverb"):
-                    if not fx.get(grupo,{}).get("type"):
-                        raise ValueError(f"Selecione o tipo de {grupo} em todos os timbres.")
-            novo = copy.deepcopy(base)
-            if atual["chave"] and atual["chave"] != chave:
-                novo.pop(atual["chave"],None)
-            novo[chave] = registro
-            remover_nomes_antigos(novo)
-            resultado = renumerar_timbres(novo)
-            destino = Path(pasta.get().strip()).expanduser()
-            if not destino.is_dir():
-                raise ValueError(f"Pasta Blackstar não encontrada:\n{destino}\n\nConfirme o caminho antes de salvar.")
+                    raise ValueError("Fill Voice and TVP in all tones.")
+                for group in ("modulation","delay","reverb"):
+                    if not fx.get(group,{}).get("type"):
+                        raise ValueError(f"Select the {group} type in all tones.")
+            new = copy.deepcopy(base)
+            if current["bracket"] and current["bracket"] != bracket:
+                new.pop(current["bracket"],None)
+            new[bracket] = register
+            remove_old_names(new) 
+            result = renumber_tones(new)
+            destination = Path(folder.get().strip()).expanduser()
+            if not destination.is_dir():
+                raise ValueError(f"Blackstar folder not found:\n{destination}\n\nConfirm the path before saving.")
             if not messagebox.askyesno(
-                "Confirmar exportação",
-                "A numeração será recalculada para toda a base. "
-                "Isso pode renomear presets antigos e substituir arquivos .bstar "
-                "na pasta Blackstar. Um backup será criado antes. Continuar?",
-                parent=janela_ed
+                "Confirm export",
+                "The numbering will be recalculated for the entire database. "
+                "This can rename old presets and replace .bstar files "
+                "in Blackstar folder. A backup will be crated before. Continue?",
+                parent=window_ed
             ):
                 return
             with tempfile.TemporaryDirectory() as tmp:
-                temporaria = Path(tmp)
-                total = gerar_patches(novo,temporaria)
+                temporary = Path(tmp)
+                total = create_patches(new,temporary)
                 if not total:
-                    raise ValueError("Nenhum patch foi gerado.")
-                # JSON temporário ao lado dos scripts, nunca na pasta Blackstar.
-                json_tmp = base_json.with_name(base_json.name + ".novo")
-                json_tmp.write_text(json.dumps(novo,ensure_ascii=False,indent=4),encoding="utf-8")
-                # Backup antes de sobrescrever o JSON ou qualquer patch existente.
-                pasta_backup = base_json.parent / "backups_timbres" / datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-                pasta_backup.mkdir(parents=True,exist_ok=False)
-                shutil.copy2(base_json,pasta_backup/base_json.name)
-                patches_backup = pasta_backup/"patches"
+                    raise ValueError("No patch was generated.")
+                # Temporary JSON next to the scripts, never on Blackstar folder.
+                json_tmp = base_json.with_name(base_json.name + ".new")
+                json_tmp.write_text(json.dumps(new,ensure_ascii=False,indent=4),encoding="utf-8")
+                # Backup before overwriting the JSON or any existing patch.
+                folder_backup = base_json.parent / "backups_timbres" / datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                folder_backup.mkdir(parents=True,exist_ok=False)
+                shutil.copy2(base_json,folder_backup/base_json.name)
+                patches_backup = folder_backup/"patches"
                 patches_backup.mkdir()
-                for arquivo in temporaria.glob("*.bstar"):
-                    existente = destino/arquivo.name
-                    if existente.exists():
-                        shutil.copy2(existente,patches_backup/arquivo.name)
-                # A renumeração original pode mudar números de presets antigos.
-                # Portanto exportamos a coleção inteira, não só os novos.
-                for arquivo in temporaria.glob("*.bstar"):
-                    os.replace(arquivo,destino/arquivo.name)
+                for file in temporary.glob("*.bstar"):
+                    existing = destination/file.name
+                    if existing.exists():
+                        shutil.copy2(existing,patches_backup/file.name)
+                # The runumbering can change the number of old presets.
+                # So we export all colection, not only the new ones.
+                for file in temporary.glob("*.bstar"):
+                    os.replace(file,destination/file.name)
                 os.replace(json_tmp,base_json)
             base.clear()
-            base.update(novo)
-            ao_salvar()
-            messagebox.showinfo("Concluído",
-                f"JSON salvo.\n{resultado['musicas']} músicas processadas.\n"
-                f"{resultado['presets_unicos']} presets únicos exportados.\n"
-                f"Backup: {pasta_backup}",parent=janela_ed)
-            janela_ed.destroy()
+            base.update(new)
+            when_save()
+            messagebox.showinfo("Finished",
+                f"JSON saved.\n{result['musics']} songs processed.\n"
+                f"{result['presets_unicos']} unique presets exported.\n"
+                f"Backup: {folder_backup}",parent=window_ed)
+            window_ed.destroy()
         except Exception as erro:
-            messagebox.showerror("Erro ao salvar",str(erro),parent=janela_ed)
+            messagebox.showerror("Save error",str(erro),parent=window_ed)
 
-    import tkinter.simpledialog
-    variante.bind("<<ComboboxSelected>>",mudar_variante)
-    selecao.bind("<<ComboboxSelected>>",escolher)
-    nova()
+    variant.bind("<<ComboboxSelected>>",change_variant)
+    selection.bind("<<ComboboxSelected>>", choose)
+    search_entry.bind("<Return>", lambda event: select_first_result())
+    def select_first_result():
+        if visible_brackets:
+            selection.current(0)
+            choose()
+    filter_songs()
+    new()
