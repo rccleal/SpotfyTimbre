@@ -1,0 +1,37 @@
+
+# Credenciais e autenticação do Spotify
+.env
+.env.*
+!.env.example
+.cache
+.cache-*
+
+# Ambiente virtual Python
+.venv/
+venv/
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Backups
+backup/
+backups_timbres/
+base_timbres_backup*.json
+
+# Arquivos gerados pelo PyInstaller
+build/
+dist/
+*.spec
+
+# Presets Blackstar gerados
+bstar_presets/
+
+# Arquivos temporários
+*.log
+*.tmp
+
+# Arquivos do Windows
+Thumbs.db
+Desktop.ini
