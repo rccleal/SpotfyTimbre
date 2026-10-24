@@ -322,4 +322,4 @@ if __name__ == "__main__":
 #Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 #.\.venv\Scripts\Activate.ps1
 #.\.venv\Scripts\python.exe main.py
-#.\.venv\Scripts\pyinstaller.exe --noconsole --onedir --name SpotifytoneFinder main.py
+#.\.venv\Scripts\pyinstaller.exe --noconsole --onedir --name SpotifyToneFinder main.py
